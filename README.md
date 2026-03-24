@@ -1,6 +1,9 @@
 # startrepo
 
-A Claude Code skill for bootstrapping production-ready Next.js projects from scratch.
+Two Claude Code skills for Next.js projects:
+
+- **`startrepo.md`** — bootstrap a new project from scratch
+- **`reviewrepo.md`** — audit an existing project against production patterns
 
 ## What it does
 
@@ -27,31 +30,35 @@ Each module is opt-in. You can include all or just what you need.
 npm install -g @anthropic-ai/claude-code
 ```
 
-### 2. Add the skill
-
-Copy `startrepo.md` to your Claude skills directory:
+### 2. Add the skills
 
 ```bash
 mkdir -p ~/.claude/skills
 cp startrepo.md ~/.claude/skills/startrepo.md
+cp reviewrepo.md ~/.claude/skills/reviewrepo.md
 ```
 
-### 3. Run it
+### 3. Use them
 
-Open Claude Code in the directory where you want to create your project:
+**New project** — open Claude Code in the directory where you want to create it:
 
 ```bash
 cd ~/code
 claude
-```
-
-Then type:
-
-```
 /startrepo
 ```
 
-Claude will ask for your project name, modules, and GitHub visibility — then scaffold everything automatically.
+Claude asks for project name, modules, and GitHub visibility — then scaffolds everything automatically.
+
+**Existing project** — open Claude Code inside the project:
+
+```bash
+cd ~/my-project
+claude
+/reviewrepo
+```
+
+Claude reads the codebase, checks it against ~40 patterns across security, SEO, auth, email, DB, and more, and reports: ✅ done / ⚠️ partial / ❌ missing. Then offers to fix issues one by one.
 
 ## What gets created
 
