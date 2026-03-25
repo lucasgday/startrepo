@@ -494,7 +494,15 @@ Install: `pnpm add @sentry/nextjs`
 - `src/instrumentation.ts` — `Sentry.init(getSentryInitOptions("server"))` for server runtime
 - `src/instrumentation-client.ts` — `Sentry.init(...)` with replaysSessionSampleRate + replaysOnErrorSampleRate + Sentry.replayIntegration()
 - `src/sentry.server.config.ts` + `src/sentry.edge.config.ts` — thin init files
-- `src/app/global-error.tsx` — Next.js global error boundary with `Sentry.captureException`
+- `src/app/global-error.tsx` — Next.js global error boundary. Pattern:
+  ```tsx
+  useEffect(() => {
+    Sentry.captureException(error, { extra: { digest: error.digest } });
+  }, [error]);
+  // Always show error.digest to users — safe hash for support correlation
+  {error.digest && <p>Ref: {error.digest}</p>}
+  ```
+- **Route-level `error.tsx`**: add alongside `page.tsx` for main routes. Renders inside the app shell (sidebar intact). Captures to Sentry with route context + shows digest.
 
 ### next.config.ts
 
@@ -613,6 +621,65 @@ Create `CLAUDE.md` at repo root:
 ## CSS
 - CSS variables for all design tokens. Use CSS Modules colocated with components.
 - Core variables: `--accent`, `--card`, `--muted`, etc. Never hardcode colors.
+
+## SWR + SSR data bootstrap
+- For pages with critical above-the-fold data, fetch server-side and pass as SWR `fallbackData` to avoid loading flash:
+```tsx
+// page.tsx (server component)
+const data = await fetchHabits(session.user.id, today);
+return <ClientShell initialHabitsData={data} />;
+
+// client-shell.tsx
+const { data } = useSWR(key, fetcher, { fallbackData: initialHabitsData });
+```
+- Only use `fallbackData` for the initial selected date/state — clear it when the user navigates away.
+- Pair with a `<LoadingShell />` skeleton for the `data === undefined` state so the page never shows blank.
+
+## PWA cold start
+- Set `start_url: "/launch"` in `manifest.ts` instead of the authenticated route.
+- `/launch` is a `force-static` page cached by the service worker — renders instantly on cold start.
+- It shows a loading skeleton and does `router.replace("/today")` client-side.
+- Add `/launch` to `isPublicPath()` in middleware so unauthenticated hits redirect to login normally.
+- SW caches both `/~offline` and `/launch` on install; bump cache version when changing cached URLs.
+
+## CI (GitHub Actions)
+Add `.github/workflows/ci.yml` on day 1:
+```yaml
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm tsc --noEmit
+      - run: pnpm lint          # hard blocker — catches react-hooks/rules-of-hooks
+      - run: pnpm test --run
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+```
+Add the three Supabase secrets in GitHub → Settings → Secrets → Actions.
+
+## React — Rules of Hooks
+**Never place any hook after an early return.** React requires hooks to be called in the same order every render. A hook after `if (condition) return ...` causes a hook count mismatch → global crash.
+
+Correct order: all hooks → early returns → handler functions → return JSX.
+
+ESLint `react-hooks/rules-of-hooks` catches this automatically — which is why `pnpm lint` must be a CI gate.
 
 ## API / DB
 - All Supabase queries in `src/lib/db/supabase-repository.ts`.

@@ -33,6 +33,19 @@ Read only the files needed to verify each item. Don't guess.
 
 ---
 
+### CI / Quality gates
+- [ ] `.github/workflows/ci.yml` exists with `pnpm tsc --noEmit`, `pnpm lint`, `pnpm test --run`
+- [ ] `pnpm lint` is a hard blocker (not just a warning) — catches `react-hooks/rules-of-hooks`
+- [ ] GitHub Secrets configured for Supabase keys
+
+### React hooks
+- [ ] No hook (`useEffect`, `useSWR`, `useState`, etc.) placed after an early `return` — would cause hook count mismatch crash
+- [ ] Verify with `pnpm lint`: zero `react-hooks/rules-of-hooks` errors
+
+### Error boundaries
+- [ ] `src/app/global-error.tsx` exists with `Sentry.captureException` + `error.digest` shown to user
+- [ ] Main authenticated routes have a route-level `error.tsx` (renders inside shell, not full-page takeover)
+
 ### CSS architecture
 - [ ] CSS variables defined (`--bg`, `--card`, `--ink`, `--muted`, `--accent`, etc.)
 - [ ] No hardcoded colors in components (spot-check 3 files)
